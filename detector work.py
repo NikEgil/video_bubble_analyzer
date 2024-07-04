@@ -8,6 +8,7 @@ from PIL import Image, ImageTk
 from multiprocessing import Process
 import cv2 as cv2
 import time
+import lib
 from threading import Thread
 
 import imageio.v3 as iio
@@ -19,7 +20,7 @@ frame=0
 base=[10,10,10,10,10,10]
 
 #(x0,y0,x1,y1)
-pos=(152, 307, 248, 403)
+pos=(152, 207, 248, 303)
 pos_rs=list(np.array(pos)/1.5)
 
 
@@ -74,6 +75,8 @@ def main_threads_start():
     Thread(target=video_capture,daemon=True).start()
     Thread(target=upd_can,daemon=True).start()
     Thread(target=upd_graph,daemon=True).start()
+    Thread(target=save,daemon=True).start()
+
     
 
 def upd_can():
@@ -95,67 +98,106 @@ def upd_can():
             canvas.create_text(20,20,fill='white', font=('16'), text=s,tags='text')
             s+=1
 
-def analize(mas):
-    col=[0]*size
-    mi=base[3]-10
-    ma=base[3]+10
-    for i in range(size):
-        if i==0:
-            print(mas[0][i]-mas[1][i])
-        if mi<mas[0][i]-mas[1][i]<ma:
-            col[i]=200
+def analize(raznica,chanel1,chanel2):
+    _size=len(chanel1)
+    _min=raznica-10
+    _max=raznica+10
+    col=[]
+    for i in range(_size):
+        if _min<chanel1[i]-chanel2[i]<_max: #and mi2<mas[1][i]-mas[2][i]<ma2:
+            col.append(200)
+        else:
+            col.append(0)
     return col
 
-class mas():
-    
+
 
 size=1000
-colors=[[0]*size,[0]*size,[0]*size]
-control=[0]*size
+dsize=50
+Red=lib.Mas(size)
+Green=lib.Mas(size)
+Blue=lib.Mas(size)
+new_R=[]
+new_G=[]
+new_B=[]
+control=lib.Mas(size)
+dm=lib.Mas(dsize)
+new=False
 def upd_graph():
     global stack
-    global colors
     time.sleep(3)
+    global new_B
+    global new_G
+    global new_R
+    global new
     while True:
-        if len(stack)>50:
+        if len(stack)>=dsize:
             s1=stack.copy()
             stack.clear()
-            stack_size=len(s1)
-            # x1=np.arange(stack_size)
-            #[y0:y1,x0:x1,chanel]
             for frame in s1:
-                colors[0].append(np.average(frame[pos[1]:pos[3],pos[0]:pos[2],0]))
-                colors[1].append(np.average(frame[pos[1]:pos[3],pos[0]:pos[2],1]))
-                colors[2].append(np.average(frame[pos[1]:pos[3],pos[0]:pos[2],2])) 
-            del colors[0][0:stack_size]
-            del colors[1][0:stack_size]
-            del colors[2][0:stack_size]
-            control=analize(colors)
+                new_R.append(np.average(frame[pos[1]:pos[3],pos[0]:pos[2],0]))
+                new_G.append(np.average(frame[pos[1]:pos[3],pos[0]:pos[2],1]))
+                new_B.append(np.average(frame[pos[1]:pos[3],pos[0]:pos[2],2]))
+            control.push(analize(base[3],new_R,new_G))
+            # print(new_B)
+            Red.push(new_R)
+            Green.push(new_G)
+            Blue.push(new_B)
+            new =True
             ax.clear()
-            ax.plot(colors[0], c='tab:red')
-            ax.plot(colors[1], c='tab:green')
-            ax.plot(colors[2], c='tab:blue')
-            ax.plot(control, c='black')
+            ax.plot(Red.data, c='tab:red')
+            ax.plot(Green.data, c='tab:green')
+            ax.plot(Blue.data, c='tab:blue')
+            ax.plot(control.data, c='black')
             # ax.text(500,200,stack_size)
-            ax.scatter(50,240,s=200,color=(colors[0][stack_size]/255,colors[1][stack_size]/255,colors[2][stack_size]/255))
+            ax.scatter(50,240,s=200,color=(np.average(new_R)/255,np.average(new_G)/255,np.average(new_B)/255))
             ax.set_ylim(0,255)
             fig.draw_idle()
         else:
-            time.sleep(0.01)
+            time.sleep(0.005)
 
+def save():
+    global new
+    i=0
+    time.sleep(6)
+    name='test'+".txt"
+    with open(name, "a") as file:
+        file.write('n\ttime\tR\tG\tB\n')
+        while True:
+            if new and working:
+                print('da')
+                new=False
+                for j in range(len(new_B)):
+                    file.write(array_to_str([i,time.ctime(),new_R[j],new_G[j],new_B[j]])+'\n')
+                    i+=1
+                print('save ',i)
+            else:
+                time.sleep(0.005)
+        file.close()
 
+def array_to_str(arr):
+    s=''
+    for i in range(len(arr)):
+        s+=(str(arr[i])+'\t')
+    return s
+working=False
+def on_closing():
+    global working
+    working=False
+    print('close')
 
 def get_base():
     global base
     #R G B
-    base=[colors[0][size-1],colors[1][size-1],colors[2][size-1]]
+    base=[Red[size-1],Green[size-1],Blue[size-1]]
     #R-G R-B G-B
-    base.extend([base[0]-base[1],base[0]-base[2],base[1]-base[2]])
+    base.extend([Red[size-1]-Green[size-1],Red[size-1]-Blue[size-1],Green[size-1]-Blue[size-1]])
     print("base: ", base)
 
 def move(event):
     global pos
     global pos_rs
+    global working
     print(event.keysym)
     shift=5
     size=2
@@ -173,14 +215,19 @@ def move(event):
         pos=(pos[0],pos[1]+shift,pos[2],pos[3]+shift) 
     if event.keysym=="space":
         get_base()  
+    if event.keysym=="s":
+        if working:
+            working=False
+        else:
+            working=True
+        print("working=",working)
     print(pos,pos[2]-pos[0])
     pos_rs=list(np.array(pos)/1.5)
 
-
+#root.protocol("WM_DELETE_WINDOW", on_closing)
 root.bind("<<event>>",upd_graph)
-for i in ('<Up>','<Down>','<Left>','<Right>','<m>','<b>','<space>'):
+for i in ('<Up>','<Down>','<Left>','<Right>','<m>','<b>','<space>','<s>'):
     root.bind(i,move)
 root.after(1,main_threads_start)
-
 root.mainloop()
 
