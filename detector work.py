@@ -15,12 +15,12 @@ import imageio.v3 as iio
 
 # vid = imageio.get_reader('<video0>')
 
-vid = iio.imiter("<video0>")
+vid = iio.imiter("<video1>")
 frame=0
 base=[10,10,10,10,10,10]
 
 #(x0,y0,x1,y1)
-pos=(152, 207, 248, 303)
+pos=(174, 404, 346, 576)
 pos_rs=list(np.array(pos)/1.5)
 
 
