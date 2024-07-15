@@ -8,17 +8,14 @@ import cv2 as cv2
 import time
 import lib
 from threading import Thread
-
 import imageio.v3 as iio
-
-# vid = imageio.get_reader('<video0>')
+import os
 
 vid = iio.imiter("<video0>")
-frame=0
-base=[10,10,10,10,10,10]
 
+base=[10,10,10,10,10,10]
 #(x0,y0,x1,y1)
-pos=(738, 438, 1002, 702)
+pos=(843, 423, 887, 467)
 pos_rs=list(np.array(pos)/1.5)
 
 
@@ -33,40 +30,20 @@ fig.get_tk_widget().pack(side=tk.LEFT, fill='both')
 canvas = tk.Canvas(root, width=1280, height=720)
 canvas.pack()
 
-flag=False
 
+frame=0
 stack=[]
-stack_size=300
-count=0
-st=time.time()
 img=0
-ct=time.time()
 
 
 def video_capture():
     global stack
     global frame
+    k=1
     while True:
         frame=next(vid)
         stack.append(frame)
-        # count+=1
-        # if time.time()-ct>1: 
         time.sleep(0.01)
-        #     print(count/dt)
-        #     print(count)
-        #     ct=time.time()
-        #     stack_size=count
-        #     count=0
-        #     root.event_generate("<<event>>")
-        #     stack=[]
-        # ms=time.time()-st 
-        # if ms<0.01:
-        #     ms=10-ms*1000
-        #     ms=int(ms)
-        #     # print(st, ms)
-        # else:
-        #     ms=1
-    # root.after(1,video_capture)
 
 
 def main_threads_start():
@@ -93,24 +70,25 @@ def upd_can():
             canvas.create_image(0, 0, image=img, anchor="nw",tags='image') 
             canvas.image=img
             canvas.create_rectangle(pos_rs, tags='sq')
-            canvas.create_text(20,20,fill='white', font=('16'), text=s,tags='text')
+            # canvas.create_text(20,20,fill='white', font=('16'), text=is_buble[49],tags='text')
             s+=1
 
-def analize(raznica,chanel1,chanel2):
-    _size=len(chanel1)
-    _min=raznica-10
-    _max=raznica+10
-    col=[]
-    for i in range(_size):
-        if _min<chanel1[i]-chanel2[i]<_max: #and mi2<mas[1][i]-mas[2][i]<ma2:
-            col.append(200)
-        else:
-            col.append(0)
-    return col
+gap=10
+def analize(base,chanel0,chanel1,chanel2):
+    if np.abs(np.average(np.subtract(chanel0,base[0])))<gap:
+        if np.abs(np.average(np.subtract(chanel1,base[1])))<gap:
+            if np.abs(np.average(np.subtract(chanel2,base[2])))<gap:
+                return False
+            else:  
+                return True
+        else:  
+            return True
+    else:  
+        return True
 
 
 
-size=1000
+size=2000
 dsize=50
 Red=lib.Mas(size)
 Green=lib.Mas(size)
@@ -119,68 +97,79 @@ new_R=[]
 new_G=[]
 new_B=[]
 control=lib.Mas(size)
+is_buble=False
 dm=lib.Mas(dsize)
 new=False
 def upd_graph():
     global stack
-    time.sleep(3)
+    time.sleep(1)
     global new_B
     global new_G
     global new_R
     global new
+    global is_buble
     while True:
         if len(stack)>=dsize:
             s1=stack.copy()
             stack.clear()
+            new_R.clear();new_G.clear();new_B.clear()
             for frame in s1:
                 new_R.append(np.average(frame[pos[1]:pos[3],pos[0]:pos[2],0]))
                 new_G.append(np.average(frame[pos[1]:pos[3],pos[0]:pos[2],1]))
                 new_B.append(np.average(frame[pos[1]:pos[3],pos[0]:pos[2],2]))
-            control.push(analize(base[3],new_R,new_G))
-            # print(new_B)
+            new =True
+            is_buble=analize(base,new_R,new_G,new_B)
+            print(is_buble)
+            if is_buble==True:
+                control.push([0]*dsize)
+            else:
+                control.push([200]*dsize)
             Red.push(new_R)
             Green.push(new_G)
             Blue.push(new_B)
-            new =True
             ax.clear()
             ax.plot(Red.data, c='tab:red')
             ax.plot(Green.data, c='tab:green')
             ax.plot(Blue.data, c='tab:blue')
             ax.plot(control.data, c='black')
-            # ax.text(500,200,stack_size)
             ax.scatter(50,240,s=200,color=(np.average(new_R)/255,np.average(new_G)/255,np.average(new_B)/255))
             ax.set_ylim(0,255)
             fig.draw_idle()
         else:
             time.sleep(0.005)
+
+
+if not os.path.exists(os.path.join("samples")):
+    os.makedirs(os.path.join("samples"))
 number_file=1
 def save():
     global new
     global number_file
     i=0
     time.sleep(6)
-    name_base='samples//test '
+    name_base='samples//RGB_detect '
     name=name_base+time.ctime()[10:19].replace(':','.')
     while True:
         if working:
             with open(name+".txt", "a") as file:
-                file.write('n\ttime\tR\tG\tB\n')
+                file.write('n;time;R;G;B;is Buble\n')
                 while True:
                     if new:
                         new=False
                         for j in range(len(new_B)):
-                            file.write("{0};{1};{2};{3};{4};{5}".format(i,time.ctime()[10:19], new_R[j], new_G[j], new_B[j],'\n'))
+                            file.write("{0};{1};{2};{3};{4};{5};{6}".format(i,time.ctime()[10:19], new_R[j], new_G[j], new_B[j],is_buble,'\n'))
                             i+=1
                     if i>1000000:
                         file.close()
                         i=0
+                        print('saved file ', name)   
                         name=name_base+str(number_file)+time.ctime()[10:19].replace(':','.')
                         break
                     if not working:
                         i=0
-                        number_file+=1
                         file.close()
-                        print('saved ',number_file)    
+                        print('saved ')   
+                        number_file+=1 
                         break
                     time.sleep(0.001)
         if not working:
@@ -188,7 +177,6 @@ def save():
         time.sleep(0.001)
 
                     
-
 working=False
 def on_closing():
     global working
@@ -228,8 +216,8 @@ def move(event):
         if working:
             working=False
         else:
+            print("SAVE")
             working=True
-        print("working=",working)
     print(pos,pos[2]-pos[0])
     pos_rs=list(np.array(pos)/1.5)
 
