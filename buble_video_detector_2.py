@@ -13,12 +13,12 @@ import os
 import pandas as pd
 
 
-vid = iio.imiter("<video1>")
+vid = iio.imiter("<video0>")
 
 # base=np.ones([3,3])*150
-base = np.array([[220, 220, 222], [210, 210, 212], [230, 230, 232]])
+base = np.array([[192, 191, 196], [182, 181, 186], [202, 201, 206]])
 # (x0,y0,x1,y1)
-position = (620, 290, 630, 560)
+position = (630, 200, 650, 220)
 position_resize = list(np.array(position) / 1.5)
 
 
@@ -28,18 +28,20 @@ f_left = Frame(root)
 f_right = Frame(root)
 
 
-figure = plt.Figure(figsize=(6, 3), dpi=120)
+figure1 = plt.Figure(figsize=(4, 3), dpi=100)
+ax1 = figure1.add_subplot(111)
+fig1 = FigureCanvasTkAgg(figure1, f_left)
+fig1.get_tk_widget().pack()
 
-ax = figure.add_subplot(111)
-fig = FigureCanvasTkAgg(figure, f_left)
-fig.get_tk_widget().pack(side=tk.TOP)
-
-figure2 = plt.Figure(figsize=(6, 3), dpi=120)
-ax2 = figure2.add_subplot(211)
-ax3 = figure2.add_subplot(212)
-figure2.tight_layout()
+figure2 = plt.Figure(figsize=(4, 2), dpi=100)
+ax2 = figure2.add_subplot(111)
 fig2 = FigureCanvasTkAgg(figure2, f_left)
-fig2.get_tk_widget().pack(side=tk.BOTTOM)
+fig2.get_tk_widget().pack()
+
+figure3 = plt.Figure(figsize=(4, 2), dpi=100)
+ax3 = figure3.add_subplot(111)
+fig3 = FigureCanvasTkAgg(figure3, f_left)
+fig3.get_tk_widget().pack()
 
 
 canvas = tk.Canvas(f_right, width=1280, height=720)
@@ -68,8 +70,8 @@ def MainThreads():
     Thread(target=UpdateCanvas, daemon=True).start()
     Thread(target=UpdateGraph, daemon=True).start()
     Thread(target=UpdateGraphBuble, daemon=True).start()
-    Thread(target=Analyzer, daemon=True).start()
-    Thread(target=SaveLog, daemon=True).start()
+    # Thread(target=Analyzer, daemon=True).start()
+    # Thread(target=SaveLog, daemon=True).start()
 
 
 def UpdateCanvas():
@@ -94,8 +96,8 @@ def UpdateCanvas():
 
 gap = 10
 
-size = 400
-dsize = 10
+size = 200
+dsize = 5
 Red = lib.Mas(size)
 Green = lib.Mas(size)
 Blue = lib.Mas(size)
@@ -115,24 +117,36 @@ def UpdateGraphBuble():
     x_buble = 0
     xl = 10
     print("a")
+    ax2.set_xlim(0, 30)
     while True:
         if len(seria) != buble and len(seria) > 0:
             buble = len(seria)
-            st = 0
-            if buble > 30:
-                st = buble - 30
-            if buble % 5 == 0:
-                for i in range(st, len(seria)):
-                    ax2.scatter(
-                        i,
-                        seria[i][3],
-                        color=(seria[i][0] / 255, seria[i][1] / 255, seria[i][2] / 255),
-                        s=150,
-                    )
-                fig2.draw()
-        # if plotSeparator:
-        #     ax2.plot([x_buble, x_buble], [0, 200], c="black")
-        #     plotSeparator = False
+            ax2.clear()
+            ax2.scatter(
+                seria.index.to_list(),
+                seria["len"],
+                color=seria[["R", "G", "B"]].to_numpy() / 255,
+                s=150,
+            )
+            ax2.set_title("текущая серия")
+            ax2.set_ylabel("len")
+            fig2.draw_idle()
+        if plotSeparator:
+            ax2.clear()
+            q = len(average_seria) - 1
+            ax3.set_title("усредненные серии")
+            ax3.scatter(
+                q,
+                average_seria["len"][q],
+                color=(
+                    average_seria["R"][q] / 255,
+                    average_seria["G"][q] / 255,
+                    average_seria["B"][q] / 255,
+                ),
+                s=150,
+            )
+            fig3.draw_idle()
+            plotSeparator = False
         time.sleep(0.001)
 
 
@@ -174,15 +188,15 @@ def UpdateGraph():
             Green.push(new_G)
             Blue.push(new_B)
             k += 1
-            if k == 3:
-                ax.cla()
-                ax.plot(Red.data, c="tab:red")
-                ax.plot(Green.data, c="tab:green")
-                ax.plot(Blue.data, c="tab:blue")
-                ax.plot(control.data, c="black")
-                ax.set_title("RGB в окне")
-                ax.set_ylim(0, 255)
-                fig.draw_idle()
+            if k == 8:
+                ax1.clear()
+                ax1.plot(Red.data, c="tab:red")
+                ax1.plot(Green.data, c="tab:green")
+                ax1.plot(Blue.data, c="tab:blue")
+                ax1.plot(control.data, c="black")
+                ax1.set_title("RGB в окне")
+                ax1.set_ylim(0, 260)
+                fig1.draw_idle()
                 k = 0
         else:
             time.sleep(0.001)
@@ -194,31 +208,45 @@ def BubleCenterColor(r, g, b):
         return
     _s = int(len(r) * 0.2)
     _e = int(len(r) * 0.8)
-    seria = np.append(
-        seria,
-        [
-            np.average(r[_s:_e]),
-            np.average(g[_s:_e]),
-            np.average(b[_s:_e]),
-            len(r),
-            time.ctime()[10:19].replace(":", "."),
-        ],
-    )
+    seria.loc[len(seria)] = [
+        np.average(r[_s:_e]),
+        np.average(g[_s:_e]),
+        np.average(b[_s:_e]),
+        len(r),
+        time.ctime()[10:19].replace(":", "."),
+    ]
+
+
+start_time = (time.ctime()[10:19].replace(":", "."),)
+
+
+def addpoint():
+    seria.loc[len(seria)] = [
+        np.average(new_R[0]),
+        np.average(new_G[0]),
+        np.average(new_B[0]),
+        "-",
+        time.ctime()[10:19].replace(":", "."),
+    ]
+    seria.to_excel("series/points " + str(start_time) + ".xlsx", index=False)
 
 
 def SaveAVGSeria(s):
-    average_seria = np.append(
-        average_seria,
-        [np.average(s[:, 0]), np.average(s[:, 1]), np.average(s[:, 2]), len(s)],
-    )
-    avg = pd.DataFrame(average_seria, columns=["R", "G", "B", "len"])
-    avg.to_excel("AVG Series.xlsx", index=False)
-    del avg
+    global average_seria
+    average_seria.loc[len(average_seria)] = [
+        np.average(s["R"]),
+        np.average(s["G"]),
+        np.average(s["B"]),
+        len(s),
+        time.ctime()[10:19].replace(":", "."),
+    ]
+
+    average_seria.to_excel("AVG Series.xlsx", index=False)
 
 
 # R,G,B,len,time
-seria = np.array(0)
-average_seria = np.array(0)
+seria = pd.DataFrame(columns=["R", "G", "B", "len", "time"])
+average_seria = pd.DataFrame(columns=["R", "G", "B", "len", "time"])
 
 
 def BubbleToSeria():
@@ -226,11 +254,9 @@ def BubbleToSeria():
     global average_seria
     print("делаем серию")
     SaveAVGSeria(seria)
-    seriaDF = pd.DataFrame(seria, columns=["R", "G", "B", "len", "time"])
-    name = "series/seria " + str(len(average_seria)) + ".xlsx"
-    seriaDF.to_excel(name, index=False)
-    del seriaDF
-    seria.clear()
+    print(average_seria)
+    seria.to_excel("series/seria " + str(len(average_seria)) + ".xlsx", index=False)
+    seria.drop(seria.index, inplace=True)
 
 
 def BubleCheck(base, chanel0, chanel1, chanel2):
@@ -257,21 +283,29 @@ def Analyzer():
         if do_Analyzer:
             do_Analyzer = False
             is_buble = BubleCheck(base, new_R, new_G, new_B)
-            control.push(is_buble * 200)
+
             if is_buble.all():
                 do_new_seria = True
                 collecting = True
                 c_R.extend(new_R)
                 c_B.extend(new_B)
                 c_G.extend(new_G)
+                control.push([240] * dsize)
             else:
+                control.push([0] * dsize)
                 if collecting:
                     collecting = False
-                    print("капля номер ", kap, " длина ", len(c_R))
+                    print(
+                        "серия ",
+                        len(average_seria),
+                        "капля ",
+                        len(seria),
+                        " длина ",
+                        len(c_R),
+                    )
                     kap += 1
                     BubleCenterColor(c_R, c_G, c_B)
-                    c_B.clear()
-                    c_R.clear(), c_G.clear()
+                    c_B.clear(), c_R.clear(), c_G.clear()
                     last_buble_time = time.time()
                 if time.time() - last_buble_time > 5 and do_new_seria == True:
                     print("da")
@@ -383,7 +417,7 @@ def move(event):
     if event.keysym == "c":
         SetCalibration()
     if event.keysym == "p":
-        plotaaa()
+        addpoint()
     if event.keysym == "s":
         if working:
             working = False
