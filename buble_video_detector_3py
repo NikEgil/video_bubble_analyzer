@@ -13,7 +13,7 @@ import os
 import pandas as pd
 
 
-vid = iio.imiter("<video1>")
+vid = iio.imiter("<video0>")
 
 # base=np.ones([3,3])*150
 base = np.array([[192, 191, 196], [182, 181, 186], [202, 201, 206]])
@@ -54,27 +54,62 @@ frame = 0
 frame_stack = []
 img = 0
 
+new_frame = False
+
 
 def VideoCapture():
     global frame_stack
     global frame
+    k = 1
+    global new_frame
     frame = next(vid)
+    list_times = []
     while True:
         c_frame = next(vid)
         if not np.array_equal(frame, c_frame):
             print(len(frame_stack))
             frame = c_frame
             frame_stack.append(frame)
+            list_times.append(time.ctime()[10:19].replace(":", "."))
         time.sleep(0.01)
+        if len(frame_stack) > 100 and k == 1:
+            savepics(frame_stack.copy(), list_times.copy())
+            k += 1
+
+
+def savepics(frame_stack, times):
+    for i in range(len(frame_stack)):
+        img2 = Image.fromarray(frame_stack[i])
+        img2.save("pics/" + str(i) + " " + str(times[i]) + ".png")
 
 
 def MainThreads():
     Thread(target=VideoCapture, daemon=True).start()
-    Thread(target=UpdateCanvas, daemon=True).start()
-    Thread(target=UpdateGraph, daemon=True).start()
-    Thread(target=UpdateGraphBuble, daemon=True).start()
+    # Thread(target=UpdateCanvas, daemon=True).start()
+    # Thread(target=UpdateGraph, daemon=True).start()
+    # Thread(target=UpdateGraphBuble, daemon=True).start()
     # Thread(target=Analyzer, daemon=True).start()
     # Thread(target=SaveLog, daemon=True).start()
+
+
+def collect_pics():
+    global new_frame
+    pics_count = 0
+    c_frame = frame
+    list_frames = []
+    list_times = []
+    while pics_count < 200:
+        if new_frame:
+            c_frame = frame
+            new_frame = False
+            list_frames.append(c_frame)
+            list_times.append(time.ctime()[10:19].replace(":", "."))
+            pics_count += 1
+        time.sleep(0.001)
+    print("собрано ")
+    for i in range(len(list_frames)):
+        img2 = Image.fromarray(list_frames[i])
+        img2.save("pics/" + str(i) + " " + str(list_times[i]) + ".png")
 
 
 def UpdateCanvas():
@@ -99,7 +134,7 @@ def UpdateCanvas():
 
 gap = 10
 
-size = 500
+size = 200
 dsize = 5
 Red = lib.Mas(size)
 Green = lib.Mas(size)
@@ -117,6 +152,7 @@ plotSeparator = False
 def UpdateGraphBuble():
     global plotSeparator
     buble = 0
+
     print("a")
     ax2.set_xlim(0, 30)
     while True:
@@ -428,6 +464,8 @@ def move(event):
             working = True
     if event.keysym == "f":
         BubbleToSeria()
+    if event.keysym == "o":
+        Thread(target=collect_pics, daemon=True).start()
     print(position, position[2] - position[0])
     position_resize = list(np.array(position) / 1.5)
 
@@ -452,6 +490,7 @@ for i in (
     "<f>",
     "<c>",
     "<p>",
+    "<o>",
 ):
     root.bind(i, move)
 root.after(1, MainThreads)
