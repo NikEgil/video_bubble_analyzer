@@ -13,13 +13,13 @@ import os
 import pandas as pd
 
 
-vid = iio.imiter("<video1>")
+vid = iio.imiter("<video0>")
 
 # base=np.ones([3,3])*150
 base = np.array([[192, 191, 196], [182, 181, 186], [202, 201, 206]])
 # (x0,y0,x1,y1)
 position = (630, 200, 650, 220)
-position_resize = list(np.array(position) / 1.5)
+position_resize = list(np.array(position) / 1)
 
 
 root = tk.Tk()
@@ -99,7 +99,7 @@ def UpdateCanvas():
 
 gap = 10
 
-size = 500
+size = 100
 dsize = 5
 Red = lib.Mas(size)
 Green = lib.Mas(size)
